@@ -47,7 +47,7 @@ object DDMSpark extends App {
     // Create a SparkSession to work with Spark
     val sparkBuilder = SparkSession
       .builder()
-      .appName("SparkTutorial")
+      .appName("DDMSpark")
       .master(s"local[$cores]") // local, with $cores worker cores
     val spark = sparkBuilder.getOrCreate()
 
