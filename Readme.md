@@ -5,6 +5,8 @@ Spark example and homework code for the "Distributed Data Management" lecture.
 
 This is a basic scala project that includes spark dependencies and necessary build-configuration to build a jar that can be submitted to a spark installation via spark-submit.
 
+**Note that the project is only compatible with Java <= 11. We recommend that you use Java 11 to build and run this project.**
+
 ### Checkout the project
 **git clone git@github.com:UMR-Big-Data-Analytics/ddm-spark.git**
 
