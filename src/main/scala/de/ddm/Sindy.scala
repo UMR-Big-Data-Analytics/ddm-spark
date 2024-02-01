@@ -188,7 +188,7 @@ object Sindy {
     while (candidates.nonEmpty) {
       val candidate = candidates.last
       print("\nTake next index")
-        if (allColumnTypes(candidate._1) < allColumnTypes(candidate._2)) {
+        if (allColumnTypes(candidate._1) == allColumnTypes(candidate._2)) {
           val col1 = allColumns(candidate._1)
           val col2 = allColumns(candidate._2)
           val size1 = allColumnSizes(candidate._1)
