@@ -219,6 +219,34 @@ object Sindy {
     printWriter.close()
 
 
+    val onlyDigitsRegex = "^\\d+$".r
+
+    val intPattern = "-?\\d+".r
+    val floatPattern = "-?\\d+(\\.\\d+)?".r
+    val datePattern = "\\d+-\\d+-\\d+".r
+    val phonePattern = "\\d+-\\d+-\\d+-\\d+".r
+
+
+    def isInt(x: String) = x match {
+      case intPattern() => true
+      case _ => false
+    }
+
+    def isFloat(x: String) = x match {
+      case floatPattern() => true
+      case _ => false
+    }
+
+    def isDate(x: String) = x match {
+      case datePattern() => true
+      case _ => false
+    }
+
+    def isPhone(x: String) = x match {
+      case phonePattern() => true
+      case _ => false
+    }
+
 
   }
 }
