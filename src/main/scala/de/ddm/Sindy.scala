@@ -34,7 +34,40 @@ object Sindy {
 
     var allColumns = Map[Int, Dataset[org.apache.spark.sql.Row]]()
     var allColumnSizes = Map[Int, Long]()
+    var allColumnTypes = Map[Int, Int]()
     var tableId = 0
+
+
+
+    val onlyDigitsRegex = "^\\d+$".r
+    val intPattern = "-?\\d+".r
+    val floatPattern = "-?\\d+(\\.\\d+)?".r
+    val datePattern = "\\d+-\\d+-\\d+".r
+    val phonePattern = "\\d+-\\d+-\\d+-\\d+".r
+
+
+//    def isInt(x: String) = x match {
+//      case intPattern() => true
+//      case _ => false
+//    }
+//
+//    def isFloat(x: String) = x match {
+//      case floatPattern() => true
+//      case _ => false
+//    }
+//
+//    def isDate(x: String) = x match {
+//      case datePattern() => true
+//      case _ => false
+//    }
+//
+//    def isPhone(x: String) = x match {
+//      case phonePattern() => true
+//      case _ => false
+//    }
+
+
+
 
     for (tablePath <- inputs) {
       val table = spark
@@ -49,9 +82,19 @@ object Sindy {
       for (columnName <- table.columns) {
         val columnId = tableId + columnNo * offset
         print(columnId + " " + columnName + ", ")
-        val column = table.select(table.col(columnName)).distinct()
+        val column = table.select(table.col(columnName)).distinct().persist()
         allColumns += (columnId -> column)
         allColumnSizes += (columnId -> column.count())
+
+        val row = column.first().get(0).asInstanceOf[String]
+        row match {
+          case intPattern() => allColumnTypes += (columnId -> 0)
+          case floatPattern() => allColumnTypes += (columnId -> 1)
+          case datePattern() => allColumnTypes += (columnId -> 2)
+          case phonePattern() => allColumnTypes += (columnId -> 3)
+          case _ => allColumnTypes += (columnId -> 4)
+        }
+
         columnNo += 1
       }
       tableId += 1
@@ -145,22 +188,26 @@ object Sindy {
     while (candidates.nonEmpty) {
       val candidate = candidates.last
       print("\nTake next index")
-//      if (!noINDs.contains(candidate) && !INDs.contains(candidate)) {
-        val col1 = allColumns(candidate._1)
-        val col2 = allColumns(candidate._2)
-        val size1 = allColumnSizes(candidate._1)
-        val size2 = allColumnSizes(candidate._2)
-        val joinSize = col1.join(col2, col1(col1.columns(0)) === col2(col2.columns(0)), "inner").count()
-        if (size1 < size2) {
-          moveCandidateAtIndex(candidates.size -1, joinSize == size1)
-          moveCandidateAtUnknownIndex(candidate._2, candidate._1, false)
-        } else if (size2 < size1) {
-          moveCandidateAtIndex(candidates.size -1, false)
-          moveCandidateAtUnknownIndex(candidate._2, candidate._1, joinSize == size2)
+        if (allColumnTypes(candidate._1) < allColumnTypes(candidate._2)) {
+          val col1 = allColumns(candidate._1)
+          val col2 = allColumns(candidate._2)
+          val size1 = allColumnSizes(candidate._1)
+          val size2 = allColumnSizes(candidate._2)
+          val joinSize = col1.join(col2, col1(col1.columns(0)) === col2(col2.columns(0)), "inner").count()
+          if (size1 < size2) {
+            moveCandidateAtIndex(candidates.size -1, joinSize == size1)
+            moveCandidateAtUnknownIndex(candidate._2, candidate._1, false)
+          } else if (size2 < size1) {
+            moveCandidateAtIndex(candidates.size -1, false)
+            moveCandidateAtUnknownIndex(candidate._2, candidate._1, joinSize == size2)
+          } else {
+            moveCandidateAtIndex(candidates.size -1, joinSize == size1)
+            moveCandidateAtUnknownIndex(candidate._2, candidate._1, joinSize == size2)
+          }
         } else {
-          moveCandidateAtIndex(candidates.size -1, joinSize == size1)
-          moveCandidateAtUnknownIndex(candidate._2, candidate._1, joinSize == size2)
-      }
+          moveCandidateAtIndex(candidates.size -1, false)
+        }
+
     }
 
     println("\nCandidates: " + candidates)
@@ -168,7 +215,7 @@ object Sindy {
     println("noINDs: " + noINDs)
 
     val INDMap: mutable.Map[String, ListBuffer[String]] = mutable.Map.empty.withDefaultValue(ListBuffer())
-    var INDList = ListBuffer[String]()
+//    var INDList = ListBuffer[String]()
     var counter = 1
 
     for (ind <- INDs) {
@@ -179,12 +226,15 @@ object Sindy {
       val colName1 = allColumns(ind._1).columns(0)
       val colName2 = allColumns(ind._2).columns(0)
       INDMap.update(colName1, INDMap(colName1) :+ colName2)
-      val INDString = tableNames(tableId1) + " -> " + tableNames(tableId2) + ": [" + colName1 + "] C [" + colName2 + "]\n"
+
+//      val INDString = tableNames(tableId1) + " -> " + tableNames(tableId2) + ": [" + colName1 + "] C [" + colName2 + "]\n"
 //      println(counter + " " + INDString)
-      INDList += INDString
-      //      println(counter + " " + ind + ": " + tableId1 + "." +  columnId1 + " = " + tableNames(tableId1) + "." + allColumns(ind._1).columns(0)
+//      INDList += INDString
+
+//      println(counter + " " + ind + ": " + tableId1 + "." +  columnId1 + " = " + tableNames(tableId1) + "." + allColumns(ind._1).columns(0)
 //        + "  contained in  "
 //        + tableId2 + "." +  columnId2 + " = " + tableNames(tableId2) + "." + allColumns(ind._2).columns(0))
+
       counter += 1
     }
     for (elem <- INDMap) {
@@ -205,47 +255,19 @@ object Sindy {
       println()
     }
 
-    INDList = INDList.sorted
 
-    // Write to file
-    import java.io._
-    val printWriter = new PrintWriter(new File("result.txt"))
-    counter = 1
-    for (string <- INDList) {
-//      print(counter + " " + string)
-      printWriter.write(string)
-      counter += 1
-    }
-    printWriter.close()
+//    // Write to file
+//    import java.io._
+//    val printWriter = new PrintWriter(new File("result.txt"))
+//    counter = 1
+//    INDList = INDList.sorted
+//    for (string <- INDList) {
+////      print(counter + " " + string)
+//      printWriter.write(string)
+//      counter += 1
+//    }
+//    printWriter.close()
 
-
-    val onlyDigitsRegex = "^\\d+$".r
-
-    val intPattern = "-?\\d+".r
-    val floatPattern = "-?\\d+(\\.\\d+)?".r
-    val datePattern = "\\d+-\\d+-\\d+".r
-    val phonePattern = "\\d+-\\d+-\\d+-\\d+".r
-
-
-    def isInt(x: String) = x match {
-      case intPattern() => true
-      case _ => false
-    }
-
-    def isFloat(x: String) = x match {
-      case floatPattern() => true
-      case _ => false
-    }
-
-    def isDate(x: String) = x match {
-      case datePattern() => true
-      case _ => false
-    }
-
-    def isPhone(x: String) = x match {
-      case phonePattern() => true
-      case _ => false
-    }
 
 
   }
