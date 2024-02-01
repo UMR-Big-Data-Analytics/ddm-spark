@@ -60,13 +60,19 @@ object Sindy {
 
 
     // Generate candidates
-    var candidates = allColumns.keys
+    val candidates = allColumns.keys
       .flatMap(x => allColumns.keys.map(y => (x, y)))
       .filter(c => c._1 != c._2)
-      .toBuffer// Todo sort candidates according to size descending because buffer is shortened from the end!
-// Todo: replace var with val
-    var INDs = ListBuffer[(Int, Int)]()
-    var noINDs = ListBuffer[(Int, Int)]()
+      .toBuffer
+      .sortWith((x, y) => { // Sort candidates according to size descending because buffer is shortened from the end!
+        allColumnSizes(x._1) + allColumnSizes(x._2) > allColumnSizes(y._1) + allColumnSizes(y._2)
+      })
+    // Check ordering
+//    candidates.foreach(c => print((allColumnSizes(c._1) + allColumnSizes(c._2)) + ", "))
+//    println()
+
+    val INDs = ListBuffer[(Int, Int)]()
+    val noINDs = ListBuffer[(Int, Int)]()
 
 
     def moveCandidateAtUnknownIndex(columnId1: Int, columnId2: Int, isIND: Boolean): Boolean = {
@@ -82,8 +88,8 @@ object Sindy {
 
         if (isIND) {
           print("\nNew IND found!")
-          var newINDs = ListBuffer[(Int, Int)]()
-          var newNoINDs = ListBuffer[(Int, Int)]()
+          val newINDs = ListBuffer[(Int, Int)]()
+          val newNoINDs = ListBuffer[(Int, Int)]()
           for (ind <- INDs) {
             if (ind._2 == candidate._1) {
               newINDs += ((ind._1, candidate._2))
@@ -143,16 +149,16 @@ object Sindy {
     println("INDs: " + INDs)
     println("noINDs: " + noINDs)
 
-    var INDList = List[String]()
+    var INDList = ListBuffer[String]()
     var counter = 1
     for (ind <- INDs) {
       val tableId1 = ind._1 % offset
 //      val columnId1 = ind._1 / offset
       val tableId2 = ind._2 % offset
 //      val columnId2 = ind._2 / offset
-      val INDString = tableNames(tableId1) + " -> " + tableNames(tableId2) + ": [" + allColumns(ind._1).columns(0) + "] C [" + allColumns(ind._2).columns(0) + "]"
-      println(counter + " " + INDString)
-      INDList + INDString
+      val INDString = tableNames(tableId1) + " -> " + tableNames(tableId2) + ": [" + allColumns(ind._1).columns(0) + "] C [" + allColumns(ind._2).columns(0) + "]\n"
+//      println(counter + " " + INDString)
+      INDList += INDString
       //      println(counter + " " + ind + ": " + tableId1 + "." +  columnId1 + " = " + tableNames(tableId1) + "." + allColumns(ind._1).columns(0)
 //        + "  contained in  "
 //        + tableId2 + "." +  columnId2 + " = " + tableNames(tableId2) + "." + allColumns(ind._2).columns(0))
@@ -166,7 +172,7 @@ object Sindy {
     val printWriter = new PrintWriter(new File("result.txt"))
     counter = 1
     for (string <- INDList) {
-      println(counter + " " + string)
+      print(counter + " " + string)
       printWriter.write(string)
       counter += 1
     }
