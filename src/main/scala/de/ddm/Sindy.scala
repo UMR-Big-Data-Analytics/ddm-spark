@@ -2,6 +2,7 @@ package de.ddm
 
 import org.apache.spark.sql.{DataFrame, Dataset, Row, SparkSession}
 
+import scala.collection.mutable
 import scala.collection.mutable.ListBuffer
 
 object Sindy {
@@ -57,7 +58,6 @@ object Sindy {
       println()
     }
 //    println("\nAll columns: " + allColumns)
-
 
     // Generate candidates
     val candidates = allColumns.keys
@@ -167,20 +167,42 @@ object Sindy {
     println("INDs: " + INDs)
     println("noINDs: " + noINDs)
 
+    val INDMap: mutable.Map[String, ListBuffer[String]] = mutable.Map.empty.withDefaultValue(ListBuffer())
     var INDList = ListBuffer[String]()
     var counter = 1
+
     for (ind <- INDs) {
       val tableId1 = ind._1 % offset
 //      val columnId1 = ind._1 / offset
       val tableId2 = ind._2 % offset
 //      val columnId2 = ind._2 / offset
-      val INDString = tableNames(tableId1) + " -> " + tableNames(tableId2) + ": [" + allColumns(ind._1).columns(0) + "] C [" + allColumns(ind._2).columns(0) + "]\n"
+      val colName1 = allColumns(ind._1).columns(0)
+      val colName2 = allColumns(ind._2).columns(0)
+      INDMap.update(colName1, INDMap(colName1) :+ colName2)
+      val INDString = tableNames(tableId1) + " -> " + tableNames(tableId2) + ": [" + colName1 + "] C [" + colName2 + "]\n"
 //      println(counter + " " + INDString)
       INDList += INDString
       //      println(counter + " " + ind + ": " + tableId1 + "." +  columnId1 + " = " + tableNames(tableId1) + "." + allColumns(ind._1).columns(0)
 //        + "  contained in  "
 //        + tableId2 + "." +  columnId2 + " = " + tableNames(tableId2) + "." + allColumns(ind._2).columns(0))
       counter += 1
+    }
+    for (elem <- INDMap) {
+      INDMap.update(elem._1, INDMap(elem._1).sorted)
+    }
+    val sorted = INDMap.keySet.toList.sorted
+
+//    println(INDMap)
+    for (key <- sorted) {
+      print(key + " < " + INDMap(key).head)
+      var counter = 0
+      for (referenced <- INDMap(key)) {
+        if (counter > 0) {
+          print(", " + referenced)
+        }
+        counter += 1
+      }
+      println()
     }
 
     INDList = INDList.sorted
@@ -190,7 +212,7 @@ object Sindy {
     val printWriter = new PrintWriter(new File("result.txt"))
     counter = 1
     for (string <- INDList) {
-      print(counter + " " + string)
+//      print(counter + " " + string)
       printWriter.write(string)
       counter += 1
     }
