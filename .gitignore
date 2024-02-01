@@ -44,3 +44,4 @@ data/TPCH
 build.log
 
 solution
+/result.txt

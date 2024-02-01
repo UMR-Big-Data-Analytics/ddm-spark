@@ -18,10 +18,9 @@ object Sindy {
 
 
   def discoverINDs(inputs: List[String], spark: SparkSession): Unit = {
-    println("Files: " + inputs)
-
+//    println("Files: " + inputs)
     val tableNames = inputs.map(s => s.split("/")(2).split("\\.")(0)).toList
-    println(tableNames)
+    println("Tables: " + tableNames)
 
     // Find necessary offset
     var offset = 10;
@@ -29,11 +28,9 @@ object Sindy {
       offset *= 10
     }
 
-
     // Importing implicit encoders for standard library classes and tuples that are used as Dataset types
     import spark.implicits._
-    //    var allColumns = spark.emptyDataFrame
-    //    var tables = Map[Int, DataFrame]()
+
     var allColumns = Map[Int, Dataset[org.apache.spark.sql.Row]]()
     var allColumnSizes = Map[Int, Long]()
     var tableId = 0
@@ -46,60 +43,71 @@ object Sindy {
         .option("quote", "\"")
         .option("delimiter", ";")
         .csv(tablePath)
-      //        .toDF("ID", "Name", "Password", "Gene")
-      //        .as[(String, String, String, String)]
-      //      tables.show()
-      //      tables += (tableId1 -> table)
-      var columnNo = 0
 
+      var columnNo = 0
       for (columnName <- table.columns) {
-        print("\n" + tableId + " " + columnName)
         val columnId = tableId + columnNo * offset
+        print(columnId + " " + columnName + ", ")
         val column = table.select(table.col(columnName)).distinct()
-        allColumnSizes += (columnId -> column.count())
         allColumns += (columnId -> column)
+        allColumnSizes += (columnId -> column.count())
         columnNo += 1
       }
-
       tableId += 1
+      println()
     }
-    println()
-    println(allColumns)
+    println("\nAll columns: " + allColumns)
 
 
     // Generate candidates
-    //    var candidates = List(Tuple2[Int, Int])
     var candidates = allColumns.keys
       .flatMap(x => allColumns.keys.map(y => (x, y)))
       .filter(c => c._1 != c._2)
-      .toBuffer
-
+      .toBuffer// Todo sort candidates according to size descending because buffer is shortened from the end!
+// Todo: replace var with val
     var INDs = ListBuffer[(Int, Int)]()
     var noINDs = ListBuffer[(Int, Int)]()
 
 
-    def moveUnknownIndex(columnId1: Int, columnId2: Int, isIND: Boolean): Boolean = {
+    def moveCandidateAtUnknownIndex(columnId1: Int, columnId2: Int, isIND: Boolean): Boolean = {
       val index =  candidates.indexOf((columnId1, columnId2))
-      moveIndex(index, isIND)
+      moveCandidateAtIndex(index, isIND)
     }
 
-    def moveIndex(index: Int, isIND: Boolean): Boolean = {
-      print(", removing " + index)
+    def moveCandidateAtIndex(index: Int, isIND: Boolean): Boolean = {
+      print(" r " + index + ",") // Removing
+
       if (index >= 0) {
+        val candidate = candidates.remove(index)
+
         if (isIND) {
-          INDs += candidates.remove(index)
-          println("IND found!")
-          //          // Todo: pruning!
-          //          for (index <- candidates.size - 1 until 0)
-          //          for (ind <- INDs) {
-          //            for (c <- candidates) {
-          //              if (ind._1 == c._2) {
-          //                move(c._1, ind._2, true)
-          //              }
-          //            }
-          //          }
+          print("\nNew IND found!")
+          var newINDs = ListBuffer[(Int, Int)]()
+          var newNoINDs = ListBuffer[(Int, Int)]()
+          for (ind <- INDs) {
+            if (ind._2 == candidate._1) {
+              newINDs += ((ind._1, candidate._2))
+            } else  if (ind._1 == candidate._2) {
+              newINDs += ((candidate._1, ind._2))
+            }
+          }
+          for (noInd <- noINDs) {
+            if (noInd._1 == candidate._1) {
+              newNoINDs += ((candidate._2, noInd._2))
+            } else  if (noInd._2 == candidate._2) {
+              newNoINDs += ((noInd._1, candidate._1))
+            }
+          }
+          INDs += candidate
+          for (newInd <- newINDs) {
+            moveCandidateAtUnknownIndex(newInd._1, newInd._2, true)
+          }
+          for (newNoInd <- newNoINDs) {
+            moveCandidateAtUnknownIndex(newNoInd._1, newNoInd._2, false)
+          }
+
         } else {
-          noINDs += candidates.remove(index)
+          noINDs += candidate
         }
       }
       true
@@ -110,12 +118,9 @@ object Sindy {
     // https://sparkbyexamples.com/spark/spark-select-columns-from-dataframe/
     // https://sparkbyexamples.com/spark/spark-dataframe-withcolumn/
 
-//    for (i <- candidates.size - 1 until 0) { // Todo: candidates.size - 1 until 0
-//      val candidate = candidates(i)
-//      println(", " + i + candidate)
     while (candidates.nonEmpty) {
       val candidate = candidates.last
-      println(", " + candidate)
+      print("\nTake next index")
 //      if (!noINDs.contains(candidate) && !INDs.contains(candidate)) {
         val col1 = allColumns(candidate._1)
         val col2 = allColumns(candidate._2)
@@ -123,36 +128,49 @@ object Sindy {
         val size2 = allColumnSizes(candidate._2)
         val joinSize = col1.join(col2, col1(col1.columns(0)) === col2(col2.columns(0)), "inner").count()
         if (size1 < size2) {
-          moveIndex(candidates.size -1, joinSize == size1)
-          moveUnknownIndex(candidate._2, candidate._1, false)
+          moveCandidateAtIndex(candidates.size -1, joinSize == size1)
+          moveCandidateAtUnknownIndex(candidate._2, candidate._1, false)
         } else if (size2 < size1) {
-          moveIndex(candidates.size -1, false)
-          moveUnknownIndex(candidate._2, candidate._1, joinSize == size2)
+          moveCandidateAtIndex(candidates.size -1, false)
+          moveCandidateAtUnknownIndex(candidate._2, candidate._1, joinSize == size2)
         } else {
-          moveIndex(candidates.size -1, joinSize == size1)
-          moveUnknownIndex(candidate._2, candidate._1, joinSize == size2)
-//          if (joinSize == size1) {
-//            println(col1.columns(0) + " in " + col2.columns(0) + " or " + col2.columns(0) + " in " + col1.columns(0))
-//          }
-//        }
+          moveCandidateAtIndex(candidates.size -1, joinSize == size1)
+          moveCandidateAtUnknownIndex(candidate._2, candidate._1, joinSize == size2)
       }
     }
 
-    println("Candidates: " + candidates)
+    println("\nCandidates: " + candidates)
     println("INDs: " + INDs)
     println("noINDs: " + noINDs)
 
+    var INDList = List[String]()
+    var counter = 1
     for (ind <- INDs) {
       val tableId1 = ind._1 % offset
-      val columnId1 = ind._1 / offset
+//      val columnId1 = ind._1 / offset
       val tableId2 = ind._2 % offset
-      val columnId2 = ind._2 / offset
-      println(ind + ": " + tableId1 + "." +  columnId1 + " = " + tableNames(tableId1) + "." + allColumns(ind._1).columns(0)
-        + "  contained in  "
-        + tableId2 + "." +  columnId2 + " = " + tableNames(tableId2) + "." + allColumns(ind._2).columns(0))
-      // Todo write to file
+//      val columnId2 = ind._2 / offset
+      val INDString = tableNames(tableId1) + " -> " + tableNames(tableId2) + ": [" + allColumns(ind._1).columns(0) + "] C [" + allColumns(ind._2).columns(0) + "]"
+      println(counter + " " + INDString)
+      INDList + INDString
+      //      println(counter + " " + ind + ": " + tableId1 + "." +  columnId1 + " = " + tableNames(tableId1) + "." + allColumns(ind._1).columns(0)
+//        + "  contained in  "
+//        + tableId2 + "." +  columnId2 + " = " + tableNames(tableId2) + "." + allColumns(ind._2).columns(0))
+      counter += 1
     }
 
+    INDList = INDList.sorted
+
+    // Write to file
+    import java.io._
+    val printWriter = new PrintWriter(new File("result.txt"))
+    counter = 1
+    for (string <- INDList) {
+      println(counter + " " + string)
+      printWriter.write(string)
+      counter += 1
+    }
+    printWriter.close()
 
 
 
