@@ -78,22 +78,26 @@ object Sindy {
     var noINDs = ListBuffer[(Int, Int)]()
 
 
-    def move(columnId1: Int, columnId2: Int, isIND: Boolean): Boolean = {
-      val index =  candidates.indexOf((columnId1, columnId2)) // Todo use index i from calling
+    def moveUnknownIndex(columnId1: Int, columnId2: Int, isIND: Boolean): Boolean = {
+      val index =  candidates.indexOf((columnId1, columnId2))
+      moveIndex(index, isIND)
+    }
+
+    def moveIndex(index: Int, isIND: Boolean): Boolean = {
       print(", removing " + index)
       if (index >= 0) {
         if (isIND) {
           INDs += candidates.remove(index)
           println("IND found!")
-//          // Todo: pruning!
-//          for (index <- candidates.size - 1 until 0)
-//          for (ind <- INDs) {
-//            for (c <- candidates) {
-//              if (ind._1 == c._2) {
-//                move(c._1, ind._2, true)
-//              }
-//            }
-//          }
+          //          // Todo: pruning!
+          //          for (index <- candidates.size - 1 until 0)
+          //          for (ind <- INDs) {
+          //            for (c <- candidates) {
+          //              if (ind._1 == c._2) {
+          //                move(c._1, ind._2, true)
+          //              }
+          //            }
+          //          }
         } else {
           noINDs += candidates.remove(index)
         }
@@ -109,27 +113,28 @@ object Sindy {
 //    for (i <- candidates.size - 1 until 0) { // Todo: candidates.size - 1 until 0
 //      val candidate = candidates(i)
 //      println(", " + i + candidate)
-    for (candidate <- candidates.clone()) {
+    while (candidates.nonEmpty) {
+      val candidate = candidates.last
       println(", " + candidate)
-      if (!noINDs.contains(candidate) && !INDs.contains(candidate)) {
+//      if (!noINDs.contains(candidate) && !INDs.contains(candidate)) {
         val col1 = allColumns(candidate._1)
         val col2 = allColumns(candidate._2)
         val size1 = allColumnSizes(candidate._1)
         val size2 = allColumnSizes(candidate._2)
         val joinSize = col1.join(col2, col1(col1.columns(0)) === col2(col2.columns(0)), "inner").count()
         if (size1 < size2) {
-          move(candidate._2, candidate._1, false)
-          move(candidate._1, candidate._2, joinSize == size1)
+          moveIndex(candidates.size -1, joinSize == size1)
+          moveUnknownIndex(candidate._2, candidate._1, false)
         } else if (size2 < size1) {
-          move(candidate._1, candidate._2, false)
-          move(candidate._2, candidate._1, joinSize == size2)
+          moveIndex(candidates.size -1, false)
+          moveUnknownIndex(candidate._2, candidate._1, joinSize == size2)
         } else {
-          move(candidate._1, candidate._2, joinSize == size1)
-          move(candidate._2, candidate._1, joinSize == size2)
+          moveIndex(candidates.size -1, joinSize == size1)
+          moveUnknownIndex(candidate._2, candidate._1, joinSize == size2)
 //          if (joinSize == size1) {
 //            println(col1.columns(0) + " in " + col2.columns(0) + " or " + col2.columns(0) + " in " + col1.columns(0))
 //          }
-        }
+//        }
       }
     }
 
