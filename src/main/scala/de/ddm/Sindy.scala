@@ -56,7 +56,7 @@ object Sindy {
       tableId += 1
       println()
     }
-    println("\nAll columns: " + allColumns)
+//    println("\nAll columns: " + allColumns)
 
 
     // Generate candidates
@@ -81,12 +81,12 @@ object Sindy {
     }
 
     def moveCandidateAtIndex(index: Int, isIND: Boolean): Boolean = {
-      print(" r " + index + ",") // Removing
 
       if (index >= 0) {
         val candidate = candidates.remove(index)
 
         if (isIND) {
+          print(" i" + index + ",") // IND
           print("\nNew IND found!")
           val newINDs = ListBuffer[(Int, Int)]()
           val newNoINDs = ListBuffer[(Int, Int)]()
@@ -113,7 +113,25 @@ object Sindy {
           }
 
         } else {
+          print(" o" + index + ",") // NO IND
+          val newNoINDs = ListBuffer[(Int, Int)]()
+          for (ind <- INDs) {
+            if (candidate._1 == ind._1) {
+              newNoINDs += ((ind._2, candidate._2))
+            } else  if (candidate._2 == ind._2) {
+              newNoINDs += ((candidate._1, ind._1))
+            }
+          }
           noINDs += candidate
+          for (newNoInd <- newNoINDs) {
+            moveCandidateAtUnknownIndex(newNoInd._1, newNoInd._2, false)
+          }
+        }
+      } else {  // Already moved
+        if (isIND) {
+          print(" i,")
+        } else {
+          print(" o,")
         }
       }
       true
