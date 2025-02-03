@@ -17,6 +17,7 @@ object DDMSpark extends App {
         case "--path" :: value :: tail => nextOption(map ++ Map('path -> value), tail)
         case "--cores" :: value :: tail => nextOption(map ++ Map('cores -> value.toInt), tail)
         case "--partitions" :: value :: tail => nextOption(map ++ Map('partitions -> value.toInt), tail)
+        case "--master" :: value :: tail => nextOption(map ++ Map('master -> value), tail)
         case string :: Nil => nextOption(map, Nil)
         case string :: tail => nextOption(map, tail)
       }
@@ -26,6 +27,7 @@ object DDMSpark extends App {
     val path = options.getOrElse('path, "data/TPCH")
     val cores = options.getOrElse('cores, 32)
     val partitions = options.getOrElse('partitions, 64)
+    val master = options.getOrElse('master, s"local[$cores]")
 
     // Turn off logging
     Logger.getLogger("org").setLevel(Level.OFF)
@@ -48,7 +50,7 @@ object DDMSpark extends App {
     val sparkBuilder = SparkSession
       .builder()
       .appName("DDMSpark")
-      .master(s"local[$cores]") // local, with $cores worker cores
+      .master(master.toString)
     val spark = sparkBuilder.getOrCreate()
 
     // Set the default number of shuffle partitions (default is 200, which is too high for local deployment)
